@@ -1,0 +1,664 @@
+\documentclass{report}
+
+\usepackage{listings}
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+
+\usepackage[francais]{babel}
+
+%
+\lstset{%
+language=bash,
+basicstyle=\ttfamily
+}
+\lstnewenvironment{bash}
+{\lstset{basicstyle=\small\ttfamily}}
+{}
+%
+
+
+\title{Rapport du projet d' Environnement de développement J1INPW01} 
+
+\author{Kinda AL CHAHID, Marine GUICHARD \\ Camille AUSSIGNAC, Founè Moussa DIALL\\
+Université de Bordeaux \\ 
+351, cours de la Libération, 33405 Talence Cedex, France}
+
+\date{\today}
+
+\begin{document}
+
+\maketitle
+
+
+
+\tableofcontents
+
+\chapter*{}
+
+\paragraph{Présentation du projet} Ce projet avait pour but de créer un exécutable du jeu 2048. Nous avons donc créé l'implémentation grid.c de grid.h propre au jeu (fonctions de mouvement, de score etc.), puis l'implémentation de la partie graphique, avant de travailler les stratégies de l'intelligence artificielle. Notre exécutable prend en compte le paramètre GRID{\_}SIDE présent dans le grid.h afin de créer une grille qui pourra être réinitialisée (avec la touche r), ou quittée (avec la touche q) à tout moment de la partie. Le jeu s'effectue au clavier grâce aux touches directionnelles.
+
+
+\paragraph{}Le projet a débuté rapidement par l'implémentation de la grille et de l'affichage. Puis les rôles ont été répartis, et le dépôt svn créé. Les membres du projet avaient chacun une fonction à faire au moins, et les tâches plus complexes ont été faites en commun.
+
+\paragraph{répartition des tâches}
+Kinda s'est occupée de la grille et de l'affichage, elle a implémenté le main de testgrid.c et a créé les fichiers Makefile et CMake.\\
+Founè Moussa a pour sa part implémenté les fonctions can{\_}move, do{\_}move et game{\_}over, et a contribué à la création des fonctions tests utilisées dans le CMake. Elle s'est également occupée en partie du rapport.\\
+Marine a créé le dépôt subversion et a participé à l'implémentation de la grille, elle a aidé Founè Moussa à corriger la fonction can{\_}move. Elle a implémenté la fonction add{\_}tile, ainsi que les petites fonctions du jeu comme play et reset. Elle a implémenté les tests et les stratégies, et a contribué à faire le rapport.\\
+Camille, qui est arrivée dans la classe une semaine après le début du projet, a cherché à implémenter la fonction do{\_}move.
+
+\paragraph{}Une fois que les fonctions du jeu étaient, en grande partie, implémentées, les fichiers Makefile et CMakeLists ont été créés pour faciliter le travail des membres. Ainsi, on pouvait compiler et tester automatiquement les fonctions.
+
+
+
+\part{Fonctions du jeu}
+
+Le jeu 2048 nécessite la création d'une grille. Nous avons choisi pour ce faire de créer un tableau à une dimension, plus facile à allouer et surtout à libérer. Aussi, le score est intégré à la structure grille car lorsqu'une partie est recommencée (voir la fonction reset du jeu), le score est alors remis à zéro et en faire une variable globale n'aurait alors eu aucun sens. De plus, afin de faciliter la recherche des cases vides, un second tableau free{\_}tiles de la taille de la grille a été alloué, contenant les indices des cases vides (tout les indices au moment de la création de la structure) ainsi qu'un entier contenant l'indice de la "fin" de ce tableau : free{\_}length.
+
+\chapter{Affichage}
+
+\paragraph{}
+La partie affichage du jeu a été la première à être implémentée pour ainsi permettre aux autres membres du groupe d'avoir rapidement une interface pour visualiser d'éventuels bogues à corriger. Deux versions de cette fonction ont été créées, une sans utiliser de bibliothèque particulière, et une autre créée à l'aide des fonctions de ncurses.
+
+\section{Version sans bibliothèque graphique}
+
+\paragraph{}
+Cette version de l'affichage permettait de créer une grille dynamique mais qui n'était pas réinitialisée à chaque nouvelle commande du joueur et surtout avec cette méthode, il n'était pas possible de récupérer les commandes.
+\paragraph{}
+Dès le départ, il a fallu faire une grille suffisamment large pour permettre d'afficher dans chaque case un nombre très grand, sans que cela décale la grille s'il dépassait la capacité prévue.
+Pour éviter cela, une des idées consistait à faire une grille qui grossirait automatiquement si le plus grand nombre dépassait une certaine largeur. Mais après avoir cherché comment récupérer les commandes passées au clavier, nous nous sommes rendu compte que cette version était loin d'être efficace pour jouer à 2048. 
+\paragraph{voir annexe [1]}
+
+\paragraph{}L'affichage consistait à placer un repère avec la commande move(0,0), puis pour la largeur et la hauteur définie dans le fichier grid.h, créer "manuellement" des lignes et des colonnes fixes grâce aux symboles du clavier, et à mettre au sein de chaque case ainsi créée, la valeur récupérée par get{\_}tile.
+
+\section{Version avec ncurses}
+
+\paragraph{}
+La version précédente ne nous permettait pas de récupérer correctement les commandes clavier et sans elles, can{\_}move et do{\_}move ne pouvaient fonctionner.
+\paragraph{}
+C'est pourquoi nous avons suivi les conseils du professeur et avons intégré la bibliothèque ncurses à nos fichiers grid.c, grid.h et testgrid.c .Dans un premier temps, cette version ne marchait pas totalement, des bogues d'affichage nous contraignaient énormément. En effet, nous avons remarqué que cette bibliothèque ne permettait pas au switch case de fonctionner correctement, et nous avons appris à utiliser la fonction printw au lieu du printf habituel pour afficher des résultats partiels dans l'interface graphique nouvellement créée. Une simple modification des switch case en if a permis de régler le problème de non capture des commandes.
+\paragraph{voir annexe [2]}
+
+\paragraph{}Cette version consiste à créer une boîte dont le sommet en haut à gauche est de coordonnées (0,0), puis à créer des lignes à l'aide d'une largeur et d'un hauteur définies en données globales dans le fichiers grid.h. Ces entiers ne sont pas égaux et pourtant les cases apparaissent carrées, c'est dû au fait qu'elles correspondent respectivement à la largeur et à la hauteur d'un caractère, qui lui-même n'a pas une hauteur et une largeur égales.
+Des fonctions tierces se chargent ensuite de remplir la grille : draw{\_}data appelle autant de fois la fonction draw{\_}at{\_}pos qu'il y a de cases dans la grille. Cette fonction affiche la valeur de la case en transformant l'indice du tableau à une dimension en indice de grille à deux dimensions, et enfin, elle appelle la fonction draw{\_}at{\_}XY. Cette dernière se charge de placer la valeur au milieu de la case, grâce aux coordonnées réelles de la grille.
+
+\section{Version avec SDL}
+
+\paragraph{}
+
+La bibliothèque graphique SDL fonctionne différemment selon le système d'exploitation sur lequel elle va être lancée. Ainsi, en fonction du système d'exploitation et de la gestion de la mémoire de ce système, on peux avoir plus ou moins de fuite. Les systèmes d'exploitation sous lesquels notre exécutable a été testé sont : Mac, ArchiLinux et Ubuntu (14.04 LTS). L'installation de minGw de Cmake et de SDL n'a pas aboutie sous Windows 7, nous n'avons donc pu tester la bonne marche de notre exécutable sous cette configuration.
+
+\paragraph{} L'exécutable produit avec testsdl.c fonctionne sous Ubuntu, mais génère des fuites de mémoire : 
+
+\begin{lstlisting}
+total heap usage: 175,508 allocs, 174,825 frees, 524,549,584 bytes allocated
+
+LEAK SUMMARY:
+definitely lost: 158 bytes in 7 blocks
+indirectly lost: 0 bytes in 0 blocks
+possibly lost: 0 bytes in 0 blocks
+still reachable: 127,525 bytes in 676 blocks
+suppressed: 0 bytes in 0 blocks
+
+ERROR SUMMARY: 0 errors from 0 contexts
+(suppressed: 7 from 1)
+
+\end{lstlisting}
+
+
+
+
+\chapter{Autorisation de mouvement}
+\section{description}
+
+La fonction can{\_}move doit parcourir toutes les cases de la grille pour vérifier qu'un mouvement est possible ou non. On a observé que certains mouvements sont très semblables dans leurs manières de parcourir la grille, donc on abordera ici seulement les directions UP (analoque à DOWN) et RIGHT (analogue à LEFT). Un mouvement sera possible dans deux cas : s'il est possible de faire "glisser" une tuile (si des cases sont vides autour d'elle), ou s'il est possible de fusionner deux tuiles de valeur identique.
+
+\paragraph{}Les indices de la grille sont ordonnés de cette manière : 
+\begin{tabular}{|c|c|c|c|}
+  \hline
+  0 & 4 & 8 & 12 \\
+  \hline
+  1 & 5 & 9 & 13 \\
+  \hline
+  2 & 6 & 10 & 14 \\
+  \hline
+  3 & 7 & 11 & 15 \\
+  \hline
+
+\end{tabular}
+
+
+\paragraph{}Pour la direction UP, on parcourt les cases en partant du
+haut à l'aide d'une boucle for qui prendra les valeurs 0 à GRID{\_}SIDE -1 et
+seront les X du get{\_}tiles(g,x,y),un autre for va parcourir les colonnes
+à la recherche d'une case à déplacer, les valeurs de ce for
+représenteront les Y des get{\_}tiles(g,x,y).
+S'il est possible au moins une fois de fusionner ou de bouger une
+tuile, alors la fonction renvoie true, sinon elle renvoie false. La
+direction DOWN se comporte à l'identique, le premier for qui prend la
+dernière ligne de la grille comme les X, et qui compare les cases en
+partant du bas et en remontant la colonne.
+
+\begin{lstlisting}
+if (d==UP){
+ for(int i = 0; i < GRID_SIDE; i++){
+  for(int j = 0; j <GRID_SIDE-1; j++){
+   //retourne true si il y alternance entre 0 et une autre valeur
+   if(get_tile(g, i, j) == 0 && get_tile(g, i, j+1) != 0)
+	return true;
+   //retourne true si la fusion est possible entre deux tuiles
+   if(get_tile(g, i, j) != 0 && get_tile(g, i, j) == get_tile(g, i, j+1))
+	return true;
+   }
+  }
+return false;
+}
+\end{lstlisting}
+
+\paragraph{}De la même façon, pour la direction LEFT, l'algorithme
+commence par un for qui parcourra la première colonne à gauche, ce for
+prendra les valeurs de 0 À GRID{\_}SIDE -1 qui seront les X du get{\_}tiles(g,x,y), un autre for va parcourir le première ligne de la grille en prenant les valeurs de 0 à GRID{\_}SIDE -1 ce for représentera les Y du get{\_}tiles(g,x,y).
+Ensuite, l'algorithme cherchera si une fusion ou si un déplacement est
+possible. Pour la direction RIGHT, le premier for parcours la dernière
+colonne pour remonter ensuite vers la droite et voir si un quelconque
+mouvement est possible.
+
+\begin{lstlisting}
+if (d==LEFT){
+ for(int i = GRID_SIDE-1; i >=0; i--){
+  for(int j = 0; j < GRID_SIDE-1; j++){
+   //retourne true si il y alternance entre 0 et une autre valeur
+   if((get_tile(g,i,j) == 0) && (get_tile(g, i, j+1) != 0))
+    return true;
+   // retourne true si la fusion est possible entre deux tuiles
+   if(get_tile(g, i, j) != 0 && get_tile(g, i, j) == get_tile(g, i, j+1))
+	return true;
+   }
+  }
+return false;
+ }
+
+\end{lstlisting}
+
+
+\chapter{Ajout de tuile aléatoire}
+\section{description}
+
+Dans un premier temps, on cherche à choisir aléatoirement une case vide. Pour cela, on a mis en place une liste contenant les indices des cases vides appelée free{\_}tiles, et la taille de cette liste appelée free{\_}length. Cette liste servira a optimiser la recherche d'une case vide. En effet, l'autre solution aurait été de piocher une case de la grille, de vérifier sa valeur, et si elle était non nulle, re-piocher une autre valeur et ainsi de suite jusqu'à l'obtention d'une case vide. Dans le cas où il ne reste qu'une case libre dans la grille, cette solution est inutilement longue, contrairement à notre version. 
+
+Dans un second temps, on simule une probabilité de $1/10$ d'ajouter un 4 au lieu d'un 2 en choisissant aléatoirement un nombre en 0 et 9, et si un chiffre (ici 9, choisit arbitrairement) en particulier est tiré, alors on ajoutera un 4, sinon pour tout les autres chiffres, on ajoutera un 2 à la grille.
+
+
+\begin{lstlisting}
+void add_tile (grid g){
+    int free = rand()%(g->free_length);
+    int indice_free = g->free_tiles[free];
+    for (int i =free; i<(g->free_length-1); ++i){
+          g->free_tiles[i]=g->free_tiles[i+1];
+    }
+    g->free_length--;
+    int new_tile = rand()%10;
+    if(new_tile == 9){
+          new_tile = 4;
+    }
+    else if (new_tile!=9){
+          new_tile = 2;
+    }
+    g->tiles[indice_free]=new_tile;
+}
+\end{lstlisting}
+
+\section{amélioration de l'aléatoire}
+
+Dans le fichier testgrid.c, on utilise la bibliothèque time.h pour initialiser srand(). Il s'agit d'une fonction qui prend en argument un nombre (une "graine") afin d'amorcer une génération de nombres vraiment aléatoires avec rand(). Puisqu'il faut lui passer en paramètre une valeur changeante, il est courant d'utiliser time(NULL), qui retourne un objet représentant le temps courant.
+
+\begin{lstlisting}
+#include <time.h> 
+int main (int argc, char *argv[]){
+    srand((unsigned int)time(NULL));
+    [...]
+    add_tile(g);
+    add_tile(g);
+    [...]
+}
+\end{lstlisting}
+
+
+\chapter{Mouvements}
+
+La fonction do{\_}move, à l'instar de can{\_}move, pouvait comporter de nombreuses parties de code dupliquées. La création de plusieurs fonction statiques ont pu éviter ce problème.
+
+\section{description}
+
+\paragraph{}Cette version du do{\_}move n'est pas longue mais pas facile à mettre en place. Elle utilise des fonctions auxiliaires comme :
+\begin{itemize}
+\item fusion{\_}case : fonction pour effectuer des fusions,
+\item exchange{\_}value : fonction pour effectuer des décalages,
+\item  non{\_}zero{\_}search : fonction qui cherche les tuiles non vides,
+\item free{\_}case : fonction pour trouver la dernière tuile vide.
+\end{itemize}
+
+\paragraph{}La fonction do{\_}move appelle la fonction change{\_}tile pour chaque tuile, c'est une fonction qui va centraliser les recherches de mouvements. Elle va appeler les quatre fonctions décrient plus haut et ainsi éviter la duplication de code dans do{\_}move. Chaque fonction va ensuite faire son office.
+
+\begin{lstlisting}
+void change_tile(grid g, int y, int x, dir d){
+	if(get_tile(g, y, x) != 0){
+		int r = non_zero_search(g, y, x, d);
+		if(r < GRID_SIDE && r >= 0){
+			if(d == LEFT || d == RIGHT)
+				fusion_case(g, y, x, y, r);
+			else
+				fusion_case(g, y, x, r, x); 
+		}
+		r = free_case(g, y, x, d);
+		if((r < x && d == LEFT) || (r > x && d == RIGHT))
+			exchange_value(g, y, x, y, r);
+		else if((r > y && d == DOWN) || (r < y && d == UP))
+			exchange_value(g, y, x, r, x); 
+	}
+}
+
+void do_move (grid g, dir d){
+	switch (d){
+		case LEFT:
+			for(int y = 0; y < GRID_SIDE; y++){
+				for(int x = 0; x < GRID_SIDE; x++){
+					change_tile(g, y, x, d);
+				}
+			}
+		break;
+		case RIGHT:
+			for(int y = 0; y < GRID_SIDE; y++){
+				for(int x = GRID_SIDE-1; x >= 0; x--){
+					change_tile(g, y, x, d);
+				}
+			}
+		break;
+		[...]
+	}
+}
+\end{lstlisting}
+
+\section{avantages}
+
+\paragraph{} Cette fonction ne produisant pas de duplication de code, elle est facile à comprendre et modifier légèrement une fonction ne conduira pas à réviser tout le reste.
+
+
+\chapter{Jeu}
+
+\section{Play}
+
+\paragraph{} La fonction play est la fonction principale du jeu, elle est appelée dans testgrid.c. En plus d'appeler la fonction do{\_}move et add{\_}tile, elle remet la liste des tuiles libre à jour, et elle affiche le score ainsi qu'une instruction pour reset. On a choisi de laisser la fontion can{\_}move dans le fichier testgrid.c car il nous semblait plus naturel d'appeler d'abord une fonction de test avant d'appeler la fonction de jeu. Aussi, la fonction game{\_}over n'est pas appelée car, après plusieurs tests, la fonction game{\_}over ne s'affichait pas au bon moment dans cette configuration.
+
+\begin{lstlisting}
+void play (grid g, dir d){
+  do_move(g,d);
+  int cpt=0;
+  for(int i=0; i<GRID_SIDE*GRID_SIDE; ++i){
+    if(g->tiles[i]==0){
+      g->free_tiles[cpt]=i;
+      cpt++;
+    }
+  }
+  g->free_length=cpt;
+  if(g->free_length!=0){
+    add_tile(g);     
+  }
+}
+\end{lstlisting}
+
+\section{Game over}
+
+\paragraph{}
+La fonction renvoie true uniquement si aucun mouvement n'est autorisé. La fonction aurait pu être inversée et renvoyer faux si un des mouvements était possible, mais le sens premier nous semblait plus explicite.
+
+\begin{lstlisting}
+bool game_over (grid g){
+	if(!can_move(g, UP) && !can_move(g, LEFT) &&
+	 !can_move(g, DOWN) && !can_move(g, RIGHT)){
+		return true;
+	}
+	return false;
+}
+\end{lstlisting}
+
+
+\section{Reset}
+
+\paragraph{}La fonction reset met à jour la grille, sans pour autant en appeler une nouvelle. Nous avons donc remis à 0 le score, puis mis à jour la liste des tuiles vides. La fonction reset n'était pas prévue par le grid.h mais elle nous semblait importante pour le bon déroulement du jeu.
+Dans le cas où la partie précédente a été conclue par un game over, cet affichage a été effacé dans le fichier testgrid.c, toujours pour une raison de mise à jour rapide et effective de l'affichage.
+Cette fonction nous a permis de mettre en lumière des erreurs, comme par exemple, la fonction add{\_}tile qui débutait toujours le jeu par la même grille.
+
+\begin{lstlisting}
+void reset (grid g){
+  g->score=0;
+  int cpt=0;
+  for(int i=0; i<GRID_SIDE*GRID_SIDE; ++i){
+    if(g->tiles[i]==0){
+      g->free_tiles[cpt]=i;
+      cpt++;
+    }
+  }
+  g->free_length = GRID_SIDE*GRID_SIDE -2;
+}
+\end{lstlisting}
+
+
+\part{CMake et fonctions de test}
+
+\section*{CMake}
+Dès que la consigne des tests obligatoires pour les fonctions du jeu fut donnée, le Makefile précédemment utilisé fut remplacé par un CMakeLists pour automatiser la vérification de ces tests. En plus de cela, on intégra une commande pour créer la bibliothèque du jeu, contenant le fichier grid.h. Ce fichier a été fortement inspiré du TP02.
+
+\begin{lstlisting}
+cmake_minimum_required (VERSION 2.6)
+project ("2048")
+add_definitions(-std=c99 -g -Wall -Werror)
+
+INCLUDE(FindPkgConfig)
+
+PKG_SEARCH_MODULE(SDL2_REQUIRED sdl2)
+PKG_SEARCH_MODULE(SDL2_image_REQUIRED sdl2_image)
+PKG_SEARCH_MODULE(SDL2_ttf_REQUIRED SDL2_ttf)
+INCLUDE_DIRECTORIES(${SDL2_INCLUDE_DIRS} 
+					${SDL2_IMAGE_INCLUDE_DIR} 
+					${SDL2_TTF_INCLUDE_DIR})
+
+include_directories(${2048_SOURCE_DIR})
+include_directories(${2048_SOURCE_DIR}/tests)
+include_directories(${2048_SOURCE_DIR}/strat)
+enable_testing()
+
+add_subdirectory(tests)
+add_subdirectory(strat)
+add_custom_target(check COMMAND ${CMAKE_CTEST_COMMAND})
+
+add_library(grid ${2048_SOURCE_DIR}/grid.c)
+
+add_executable(testgrid ${2048_SOURCE_DIR}/grid.h testgrid.c)
+target_link_libraries(testgrid ncurses curses grid)
+
+add_executable(testsdl ${2048_SOURCE_DIR}/grid.h testsdl.c)
+target_link_libraries(testsdl grid ${SDL2_LIBRARIES}
+	${SDL2_IMAGE_LIBRARY} ${SDL2_TTF_LIBRARY} SDL2 SDL2_ttf)
+\end{lstlisting}
+
+\paragraph{Bibliothèque dynamique}
+La compilation des bibliothèques dynamiques ont été rendues automatiques par le cmake. Ces bibliothèques se situent alors dans le dossier build/strat.
+
+\section*{Tests}
+Trois tests ont été conçus, un pour vérifier que la fonction can{\_}move et la fonction game{\_}over avaient bien le comportement désiré, et deux autres pour attester de la validité des mouvements et du score.
+Le premier test a simplement consisté à générer une grille bloquée, dont on sait qu'aucun mouvement n'est possible. La grille a donc été remplie de 4 et de 2, positionné de telle façon qu'aucune fusion n'est possible dans aucune direction. On vérifie alors que pour toutes les directions, can{\_}move renvoie faux, et que game{\_}over, lui, renvoie true.
+
+\paragraph{}grille du test 1: 
+\begin{tabular}{|c|c|c|c|}
+  \hline
+  2& 4 & 2& 4\\
+  \hline
+  4 & 2 & 4 & 2 \\
+  \hline
+  2& 4 & 2& 4\\
+  \hline
+  4 & 2 & 4 & 2 \\
+  \hline
+\end{tabular}
+\paragraph{}
+Le second et le troisième test vérifient qu'avec une grille prédéfinie et des mouvements bien précis, toutes les fusions se passent correctement et que le score est affecté. Pour cela, nous avons pris une grille remplie de 2, et avec seulement deux mouvements (non opposés), nous amenons les cases à se fusionner dans un coin précis, le score minimal est alors connu, mais l'ajout de tuile aléatoire ne permet pas de déterminer précisément le score pour chaque partie testée ainsi.
+Pour le premier test, seules les directions UP et LEFT ont été utilisées, il s'agit de les alterner pour faire converger le maximum dans le coin supérieur gauche. Si les mouvements se déroulent comme voulu, on aura dans la première case la valeur 32, et le score sera d'au moins $2*16 + 4*8 + 8*4 + 16*2 = 128$.
+
+\paragraph{}déroulement du test : 
+\begin{center}
+\begin{tabular}{|c|c|c|c|}
+  \hline
+  2& 2 & 2& 2\\
+  \hline
+  2& 2 & 2& 2\\
+  \hline
+  2& 2 & 2& 2\\
+  \hline
+  2& 2 & 2& 2\\
+  \hline
+\end{tabular} =>
+\begin{tabular}{|c|c|c|c|}
+  \hline
+ 4 & 4 & 4& 4\\
+  \hline
+ 4 & 4 & 4& 4\\
+  \hline
+  0& 0 & 0& 0\\
+  \hline
+  0 & 0 & 0 & 0 \\
+  \hline
+\end{tabular} =>
+\begin{tabular}{|c|c|c|c|}
+  \hline
+  8 & 8 & 0 & 0 \\
+  \hline
+  8 & 8 & 0 & 0 \\
+  \hline
+  0 & 0 & 0 & 0 \\
+  \hline
+  0 & 0 & 0 & 0 \\
+  \hline
+\end{tabular} 
+\end{center}
+
+\begin{center}
+=> \begin{tabular}{|c|c|c|c|}
+  \hline
+  16 & 16 & 0 & 0 \\
+  \hline
+  0 & 0 & 0 & 0 \\
+  \hline
+  0 & 0 & 0 & 0 \\
+  \hline
+  0 & 0 & 0 & 0 \\
+  \hline
+\end{tabular} =>
+\begin{tabular}{|c|c|c|c|}
+  \hline
+  32 & 0 & 0 & 0 \\
+  \hline
+  0 & 0 & 0 & 0 \\
+  \hline
+  0 & 0 & 0 & 0 \\
+  \hline
+  0 & 0 & 0 & 0 \\
+  \hline
+\end{tabular}
+\end{center}
+
+Le troisième test est symétrique au second, ce sont les directions DOWN et RIGHT qui sont testées. Le résultat est donc poussé dans la case 15.
+Les cases dans lesquelles le résultat est poussé ne sont pas prises au hasard, car quelle que soit l'implémentation de la grille, la première case sera en haut à gauche et la dernière en bas à droite.
+
+\part{Stratégies}
+\section*{Stratégie lente}
+\paragraph{} Deux stratégies lentes ont été implémentées dont fast.c et fast2.c qui sont respectivement  aléatoire et non-aléatoire.
+Ces fonctions devront jouer et renvoyer le score qu'elles ont atteint et la valeur maximum contenu dans les tuiles de la grille.
+
+\paragraph{}
+La fonction aléatoire du fichier fast.c choisit un mouvement au hasard (UP,DOWN,LEFT,RIGHT) et  la renvoie si le can{\_}move renvoie true pour cette direction, sinon il va en choisir une autre. Pour ce faire, rand() est appelé et l'indice renvoyé va déterminer la direction. Dans le cas où can{\_}move renverrait false, il va tester toutes les directions dans un autre défini pour trouver une direction qui fonctionne. Une autre solution aurait été de lancer à nouveau la fonction alea, mais pour une grille bloquée dans trois directions, il nous est apparu que cette méthode aurait été moins efficace.
+\begin{lstlisting}
+dir alea(strategy s, grid g){
+  dir t[4] = {UP,LEFT,RIGHT,DOWN};
+  int alea = rand()%4;
+  if (alea == 0 && can_move(g,t[alea])){
+    s->mem=&t[0];
+    return UP;
+  }
+  if (alea == 1 && can_move(g,t[alea])){
+    s->mem=&t[1];
+    return LEFT;
+  }
+  [...]
+\end{lstlisting}
+
+
+\paragraph{}
+La fonction non-aléatoire retourne successivement les directions UP, LEFT, DOWN, RIGHT à la condition que celle si soit autorisée par le can{\_}move. On place dans la mémoire de la stratégie l'adresse de la case du tableau choisie, et au prochain appel de la fonction cycle, on renverra simplement la case suivante.
+\begin{lstlisting}
+\begin{lstlisting}
+dir cycle(strategy s, grid g){
+  dir tab[4] = {UP,LEFT,DOWN,RIGHT};
+  for(int i=0; i<4; i++){
+    if(s->mem == NULL && can_move(g,tab[0])){
+      s->mem = &tab[0];
+      return tab[0];
+    }
+    if (s->mem == &tab[i] && can_move(g,tab[(i+1)%4])){
+      s->mem = &tab[(i+1)%4];
+      return tab[(i+1)%4];
+    }
+    else{
+      int i=0;
+      while (!can_move(g,tab[i])){
+	i++;
+      }
+      return tab[i];
+    }
+  }
+  return tab[0];
+}
+
+  [...]
+\end{lstlisting}
+
+
+
+
+
+\section*{Stratégie efficace}
+\paragraph{}La stratégie hard.c va calculer les évaluations des grilles temporaires auxquelles on aura appliqué tout les mouvements possibles, puis va renvoyer la direction qui induit la meilleure évaluation (la plus faible).
+Dans un premier temps, elle va calculer toutes les évaluations et à chaque fois qu'une évaluation est meilleure, sa direction est stockée dans une variable locale. Si la direction optimale ne peut être jouée, alors on va stocker dans deux tableaux les 4 directions et leurs évaluations. On trie ensuite ce dernier dans l'ordre croissant et on affecte tout les changements au tableau de direction afin qu'il soit classé en fonction de ses évaluations. Finalement, on va chercher à renvoyer une direction qui peut être joué et qui sera la plus optimale possible.
+
+\begin{lstlisting}
+
+dir best_ev(strategy s, grid g){
+  dir *tab = initDirs();
+  double e = ev(s,g, tab[0]);
+  dir d=UP;
+  int tmp;
+  for (int i=1; i<4; i++){
+    if (can_move(g,tab[i])){
+      tmp = ev(s,g,tab[i]);
+      if (e >= tmp){
+    	d = tab[i];
+      }
+      e = min(e,tmp);
+    }
+  }
+  if (!can_move(g,d)){
+    int tmp=0;
+    dir * list= list_ev(s,g);
+    while((!can_move(g,d)) || (tmp<4)){
+      d = list[tmp];
+      tmp ++;
+    }
+    free(list);
+  }
+  free(tab);
+  return d;
+}
+\end{lstlisting}
+
+\paragraph{problème rencontré} La stratégie fonctionne sur notre implémentation de grille mais n'a pas été portative sur l'exécutable tournament à cause de notre implémentation du can{\_}move. En effet, après de nombreux tests, nous nous sommes rendus compte que la grille n'était pas implémenté de la même façon que la notre. Les indices 0, 1, 2 et 3 se trouvaient sur la première ligne, alors que notre can{\_}move les considérait sur la première colonne. Ainsi, les résultats de cet appel n'était pas cohérent avec la grille reçue.
+
+\chapter*{Annexes}
+
+\paragraph{fonction affichage sans ncurses}[1]
+\begin{lstlisting}
+void afficher(grid g){
+	move(0,0);
+	printw("\n");
+	for (int i=0; i< GRID_SIDE;i++){
+		for (int j=0; j< GRID_SIDE;j++){
+			if(j==GRID_SIDE-1)
+        printw("+------------+");
+      else
+        printw("+------------");
+    }
+    printw("\n");
+
+    for (int j=0; j< GRID_SIDE;j++){
+      if(j==GRID_SIDE-1)
+        printw("|            |");
+      else
+        printw("|            ");
+    }
+    printw("\n");
+    for (int j=0; j< GRID_SIDE;j++){
+      if(j==GRID_SIDE-1)
+        printw("|            |");
+      else
+        printw("|            ");
+    }
+    printw("\n");
+    for (int j=0; j< GRID_SIDE;j++){
+      if(j==GRID_SIDE-1)
+        printw("| %10d |", get_tile (g,i,j));
+      else
+        printw("| %10d ", get_tile (g,i,j));
+    }
+    printw("\n");
+    for (int j=0; j< GRID_SIDE;j++){
+      if(j==GRID_SIDE-1)
+        printw("|            |");
+      else
+        printw("|            ");
+    }
+    printw("\n");
+    for (int j=0; j< GRID_SIDE;j++){
+      if(j==GRID_SIDE-1)
+        printw("|            |");
+      else
+        printw("|            ");
+    }
+    printw("\n");
+  }
+    for (int j=0; j< GRID_SIDE;j++){
+      if(j==GRID_SIDE-1)
+        printw("+------------+");
+      else
+        printw("+------------");
+    }
+  printw("\n");
+  printw("\n");
+}
+\end{lstlisting}
+
+
+\paragraph{fonction affichage avec ncurses}[2]
+\begin{lstlisting}
+void display_windows(WINDOW * win){
+  box(win,0,0);
+  for(int i=1; i<GRID_SIDE; ++i){
+    int step= HEIGHT/GRID_SIDE;
+    mvwhline(win, step*i,1,0,WIDTH-2);
+  }
+  for (int i=1; i<GRID_SIDE ; ++i){
+    int step= WIDTH/GRID_SIDE;
+    mvwvline(win,1,step*i,0,HEIGHT-2);
+  }
+}
+
+void draw_at_XY(WINDOW * win, int c, int x, int y){
+  int pos0 = HEIGHT/GRID_SIDE;
+  int pos1 = WIDTH/GRID_SIDE;
+  mvwprintw(win, (pos0/2)+(x*pos0), (pos1/2)+(y*pos1), "    ");
+  if(c!=0){
+    mvwprintw(win, (pos0/2)+(x*pos0), (pos1/2)+(y*pos1), "%d", c);
+  }
+}
+void draw_at_pos(WINDOW * win, int pos, int c){
+  int y = pos/GRID_SIDE;
+  int x= pos-(GRID_SIDE*y);
+  draw_at_XY(win, c, x, y);
+}
+
+void draw_data(WINDOW * win,grid g){
+  for (int i = 0; i < GRID_SIDE*GRID_SIDE; i++){
+    draw_at_pos(win, i, g->tiles[i]);
+  }
+}
+\end{lstlisting}
+
+
+\end{document}

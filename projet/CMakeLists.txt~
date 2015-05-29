@@ -1,0 +1,11 @@
+cmake_minimum_required (VERSION 2.6)
+project ("2048")
+add_definitions(-std=c99 -g)
+
+include_directories(${2048_SOURCE_DIR})
+include_directories(${2048_SOURCE_DIR}/tests)
+enable_testing()
+
+add_subdirectory(test)
+add_custom_target(check COMMAND ${CMAKE_CTEST_COMMAND})
+
